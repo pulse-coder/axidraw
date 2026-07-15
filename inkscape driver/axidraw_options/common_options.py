@@ -151,6 +151,20 @@ def core_options(config):
                         + " 2: Full: Also allow path reversal."\
                         + " 4: None: Strictly preserve file order.")
 
+    # DEDUPE MOD (not part of stock AxiDraw):
+    options.add_argument("--dedupe",\
+                        type=inkex.boolean_option, action="store", dest="dedupe",\
+                        default=config.get("dedupe", False),\
+                        help="Remove duplicate overlapping lines")
+
+    # CARTESIAN MOD (not part of stock AxiDraw):
+    options.add_argument("--cartesian",\
+                        type=inkex.boolean_option, action="store", dest="cartesian",\
+                        default=config.get("cartesian", True),\
+                        help="Cartesian plotter: Motor 1 drives X only,"\
+                        + " Motor 2 drives Y only, instead of AxiDraw's"\
+                        + " stock mixed-axis (CoreXY-like) motion.")
+
     options.add_argument("--resolution",\
                         type=int, action="store", dest="resolution",\
                         default=config["resolution"],\

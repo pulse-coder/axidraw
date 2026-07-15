@@ -35,6 +35,15 @@ from array import array
 from axidrawinternal.plot_utils_import import from_dependency_import # plotink
 plot_utils = from_dependency_import('plotink.plot_utils')
 
+# CARTESIAN MOD: this machine is a standard Cartesian (X/Y independent) plotter,
+# not AxiDraw's stock mixed-axis (CoreXY-like) motion system, where Motor 1 moves
+# together for X and oppositely for Y (motor1 = x+y, motor2 = x-y). Cartesian
+# mode makes Motor 1 drive X only and Motor 2 drive Y only (motor1 = x, motor2 = y).
+# Normally controlled by the "cartesian" option (checkbox in AxiDraw Control /
+# axidraw_conf.py); this constant is only the FALLBACK for callers whose options
+# object lacks the attribute. Keep True: the machine is physically Cartesian.
+CARTESIAN_MODE = True
+
 def trajectory(ad_ref, vertex_list, xyz_pos=None):
     """
     Plan the trajectory for a full path, beginning with lowering the pen and ending with
@@ -458,6 +467,8 @@ def compute_segment(ad_ref, data, xyz_pos=None):
     Note: Native motor axes are Motor 1, Motor 2:
         motor_dist1 = ( xDist + yDist ) # Distance for motor to move, Axis 1
         motor_dist2 = ( xDist - yDist ) # Distance for motor to move, Axis 2
+        (CARTESIAN MOD: when cartesian mode is enabled, instead
+        motor_dist1 = xDist and motor_dist2 = yDist.)
 
     We will only discuss motor steps, and resolution, within the context of native axes.
     """
@@ -516,24 +527,40 @@ def compute_segment(ad_ref, data, xyz_pos=None):
     vi_inch_per_s = v_i
     vf_inch_per_s = v_f
 
-    # Look at distance to move along 45-degree axes, for native motor steps:
+    # Look at distance to move along native motor axes (45-degree axes when
+    #   mixed-axis; X/Y directly when cartesian), for native motor steps:
     # Recall that step_scale gives a scaling factor for converting from inches to steps,
     #   *not* native resolution
     # ad_ref.step_scale is Either 1016 or 2032, for 8X or 16X microstepping, respectively.
 
-    motor_dist1 = delta_x_inches + delta_y_inches # Inches that belt must turn at Motor 1
-    motor_dist2 = delta_x_inches - delta_y_inches # Inches that belt must turn at Motor 2
+    # CARTESIAN MOD: option-controlled; module constant is the fallback.
+    cartesian_mode = getattr(ad_ref.options, 'cartesian', CARTESIAN_MODE)
+
+    # CARTESIAN MOD: was mixed-axis (x+y / x-y)
+    if cartesian_mode:
+        motor_dist1 = delta_x_inches # Inches that Motor 1 must turn (X axis only)
+        motor_dist2 = delta_y_inches # Inches that Motor 2 must turn (Y axis only)
+    else:
+        motor_dist1 = delta_x_inches + delta_y_inches # Inches that belt must turn at Motor 1
+        motor_dist2 = delta_x_inches - delta_y_inches # Inches that belt must turn at Motor 2
     motor_steps1 = int(round(ad_ref.step_scale * motor_dist1)) # Round to the nearest motor step
     motor_steps2 = int(round(ad_ref.step_scale * motor_dist2)) # Round to the nearest motor step
 
     # Since we are rounding, we need to keep track of the actual distance moved,
     #   not just the _requested_ distance to move.
-    motor_dist1_rounded = float(motor_steps1) / (2.0 * ad_ref.step_scale)
-    motor_dist2_rounded = float(motor_steps2) / (2.0 * ad_ref.step_scale)
+    # CARTESIAN MOD: was mixed-axis (x+y / x-y); Cartesian axes don't share a factor of 2
+    if cartesian_mode:
+        motor_dist1_rounded = float(motor_steps1) / ad_ref.step_scale
+        motor_dist2_rounded = float(motor_steps2) / ad_ref.step_scale
+        delta_x_inches_rounded = motor_dist1_rounded
+        delta_y_inches_rounded = motor_dist2_rounded
+    else:
+        motor_dist1_rounded = float(motor_steps1) / (2.0 * ad_ref.step_scale)
+        motor_dist2_rounded = float(motor_steps2) / (2.0 * ad_ref.step_scale)
 
-    # Convert back to find the actual X & Y distances that will be moved:
-    delta_x_inches_rounded = (motor_dist1_rounded + motor_dist2_rounded)
-    delta_y_inches_rounded = (motor_dist1_rounded - motor_dist2_rounded)
+        # Convert back to find the actual X & Y distances that will be moved:
+        delta_x_inches_rounded = (motor_dist1_rounded + motor_dist2_rounded)
+        delta_y_inches_rounded = (motor_dist1_rounded - motor_dist2_rounded)
 
     if abs(motor_steps1) < 1 and abs(motor_steps2) < 1: # If movement is < 1 step, skip it.
         return None, None
@@ -960,11 +987,16 @@ def compute_segment(ad_ref, data, xyz_pos=None):
 
         # If at least one motor step is required for this move, do so:
         if move_steps1 != 0 or move_steps2 != 0:
-            motor_dist1_temp = float(move_steps1) / (ad_ref.step_scale * 2.0)
-            motor_dist2_temp = float(move_steps2) / (ad_ref.step_scale * 2.0)
+            # CARTESIAN MOD: was mixed-axis (x+y / x-y); Cartesian axes don't share a factor of 2
+            if cartesian_mode:
+                x_delta = float(move_steps1) / ad_ref.step_scale # X Distance moved, inches
+                y_delta = float(move_steps2) / ad_ref.step_scale # Y Distance moved, inches
+            else:
+                motor_dist1_temp = float(move_steps1) / (ad_ref.step_scale * 2.0)
+                motor_dist2_temp = float(move_steps2) / (ad_ref.step_scale * 2.0)
 
-            x_delta = (motor_dist1_temp + motor_dist2_temp) # X Distance moved, inches
-            y_delta = (motor_dist1_temp - motor_dist2_temp) # Y Distance moved, inches
+                x_delta = (motor_dist1_temp + motor_dist2_temp) # X Distance moved, inches
+                y_delta = (motor_dist1_temp - motor_dist2_temp) # Y Distance moved, inches
             move_dist_inches = plot_utils.distance(x_delta, y_delta) # Total move, inches
 
             f_new_x = f_current_x + x_delta

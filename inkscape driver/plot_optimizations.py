@@ -46,6 +46,10 @@ These functions include:
     - Perform nearest neighbor plot reordering, if enabled
     - If path reversal is enabled, allow paths to be reversed when sorting
 
+(D) dedupe()   [DEDUPE MOD; not part of stock AxiDraw]
+    - Remove segments that retrace an already-kept segment, in either
+      direction, within a tolerance. Splits paths where segments are removed.
+
 """
 import random
 import copy
@@ -315,3 +319,92 @@ def reorder(digest, reverse):
                 next_path.reverse()
             output_path_temp.append(next_path)
         layer_item.paths = copy.copy(output_path_temp)
+
+
+def dedupe(digest, tolerance):
+    """
+    DEDUPE MOD (not part of stock AxiDraw): Remove duplicate segments.
+
+    A segment (pair of consecutive vertices) is dropped when a coincident
+    segment — same two endpoints in either direction, within the given
+    tolerance — has already been kept, anywhere in the same layer. Paths are
+    split where segments are removed, so the pen simply lifts over the
+    duplicate instead of retracing it.
+
+    Designed for CAD-style exports (e.g. SketchUp) where an edge shared by
+    two faces is written to the SVG once per face, making the pen draw the
+    same line multiple times. Only coincident segments are removed: a long
+    segment partially overlapping a shorter collinear one is NOT deduplicated,
+    and two coincident curves are deduplicated only if their flattened
+    vertices align (true for identical source geometry).
+
+    Matching uses a grid of cell size = tolerance, checking the 3x3 cell
+    neighborhood of each endpoint: segments whose endpoints deviate by less
+    than the tolerance always match; more than twice it, never.
+
+    Inputs: digest: a "flat" path_objects.DocDigest object
+            tolerance (float): endpoint matching tolerance, in inches.
+                Zero or negative disables deduplication.
+    """
+    if tolerance <= 0:
+        return
+
+    def cell_of(vertex):
+        return (int(math.floor(vertex[0] / tolerance)),
+                int(math.floor(vertex[1] / tolerance)))
+
+    def neighbor_keys(cell_a, cell_b):
+        '''Canonical segment keys over the 3x3 neighborhoods of both cells'''
+        keys = set()
+        for d_ax in (-1, 0, 1):
+            for d_ay in (-1, 0, 1):
+                n_a = (cell_a[0] + d_ax, cell_a[1] + d_ay)
+                for d_bx in (-1, 0, 1):
+                    for d_by in (-1, 0, 1):
+                        n_b = (cell_b[0] + d_bx, cell_b[1] + d_by)
+                        keys.add((n_a, n_b) if n_a <= n_b else (n_b, n_a))
+        return keys
+
+    for layer_item in digest.layers:
+        seen = set() # Canonical keys of all segments kept so far in this layer
+        new_paths = []
+        for path in layer_item.paths:
+            vertex_list = path.subpaths[0]
+            if len(vertex_list) < 2:
+                new_paths.append(path)
+                continue
+            runs = []               # Consecutive kept vertices, per output path
+            run = [vertex_list[0]]
+            run_is_real = False     # True once run holds a full-size kept segment
+            modified = False
+            for vertex in vertex_list[1:]:
+                cell_a = cell_of(run[-1])
+                cell_b = cell_of(vertex)
+                if cell_a == cell_b: # Tiny segment: keep with the current run
+                    run.append(vertex)
+                    continue
+                if seen.isdisjoint(neighbor_keys(cell_a, cell_b)):
+                    seen.add((cell_a, cell_b) if cell_a <= cell_b else (cell_b, cell_a))
+                    run.append(vertex)
+                    run_is_real = True
+                else:                # Duplicate segment: split the path here
+                    modified = True
+                    if run_is_real: # Runs of only tiny segments between removed
+                        runs.append(run) # duplicates are orphan artifacts: drop.
+                    run = [vertex]
+                    run_is_real = False
+            if run_is_real:
+                runs.append(run)
+            if not modified:
+                new_paths.append(path) # Path unchanged; keep original object.
+                continue               # (Also keeps tiny-only paths, e.g. dots.)
+            for run_number, kept_run in enumerate(runs):
+                new_path = path_objects.PathItem()
+                new_path.subpaths = [kept_run]
+                new_path.stroke = path.stroke
+                new_path.fill = path.fill
+                new_path.fill_rule = path.fill_rule
+                # Unique ids for split paths, as LayerItem.flatten does:
+                new_path.item_id = str(path.item_id) + "_d" + str(run_number)
+                new_paths.append(new_path)
+        layer_item.paths = new_paths

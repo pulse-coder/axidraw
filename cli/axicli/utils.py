@@ -12,7 +12,8 @@ OPTION_NAMES = ['mode', 'speed_pendown', 'speed_penup', 'accel', 'pen_pos_down',
                     'random_start', 'hiding', 'reordering', 'no_rotate', 'const_speed',
                     'report_time','manual_cmd', 'dist', 'layer', 'copies', 'page_delay',
                     'preview', 'rendering', 'model', 'penlift', 'port', 'port_config', 'webhook',
-                    'webhook_url', 'digest', 'progress']
+                    'webhook_url', 'digest', 'progress',
+                    'dedupe', 'cartesian'] # DEDUPE MOD + CARTESIAN MOD
 
 def handle_info_cases(no_flag_arg, quick_help, cli_version, software_name = None, version = None):
     ''' handles the simple cases like "version" and "help" '''

@@ -533,8 +533,16 @@ class AxiDraw(inkex.Effect):
                 if versions.min_fw_version(self.plot_status, "2.6.2"):
                     serial_utils.exhaust_queue(self) # Wait until all motion stops
                     a_pos, b_pos = ebb_motion.query_steps(self.plot_status.port, False)
-                    n_delta_x = -(a_pos + b_pos) / (4 * self.params.native_res_factor)
-                    n_delta_y = -(a_pos - b_pos) / (4 * self.params.native_res_factor)
+                    # CARTESIAN MOD: was mixed-axis (a_pos+b_pos / a_pos-b_pos).
+                    # Inverse of steps = step_scale * inches, where high-res
+                    # step_scale = 2 * native_res_factor; the existing *2 below
+                    # corrects for low-res mode, same as stock.
+                    if getattr(self.options, 'cartesian', motion.CARTESIAN_MODE):
+                        n_delta_x = -a_pos / (2 * self.params.native_res_factor)
+                        n_delta_y = -b_pos / (2 * self.params.native_res_factor)
+                    else:
+                        n_delta_x = -(a_pos + b_pos) / (4 * self.params.native_res_factor)
+                        n_delta_y = -(a_pos - b_pos) / (4 * self.params.native_res_factor)
                     if self.options.resolution == 2:  # Low-resolution mode
                         n_delta_x *= 2
                         n_delta_y *= 2
@@ -664,6 +672,14 @@ class AxiDraw(inkex.Effect):
             if self.options.reordering < 3: # Set reordering to 4 to disable path joining
                 plot_optimizations.connect_nearby_ends(self.digest, allow_reverse,\
                     self.params.min_gap)
+
+            # DEDUPE MOD (not part of stock AxiDraw): remove duplicate
+            # overlapping lines (e.g., shared edges in CAD/SketchUp exports).
+            # Runs AFTER connect_nearby_ends so that gaps left by removed
+            # duplicates are not bridged back over by path joining.
+            if getattr(self.options, 'dedupe', False):
+                plot_optimizations.dedupe(self.digest,\
+                    getattr(self.params, 'dedupe_tolerance', 0.001))
 
             plot_optimizations.supersample(self.digest,\
                 self.params.segment_supersample_tolerance)

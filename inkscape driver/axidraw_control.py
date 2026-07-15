@@ -210,7 +210,9 @@ class AxiDrawWrapperClass( inkex.Effect ):
             'no_rotate', 'const_speed', 'report_time', 'manual_cmd', 'dist',
             'layer', 'copies', 'page_delay', 'preview', 'rendering', 'model', 'penlift',
             'setup_type', 'resume_type', 'auto_rotate', 'resolution', 'hiding', 'reordering',
-            'random_start', 'webhook', 'webhook_url', 'digest', 'progress',]}
+            'random_start', 'webhook', 'webhook_url', 'digest', 'progress',
+            'dedupe',      # DEDUPE MOD: pass dedupe through to the AxiDraw instance
+            'cartesian',]} # CARTESIAN MOD: pass cartesian through as well
         ad.options.__dict__.update(selected_options)
 
         ad.options.port = port

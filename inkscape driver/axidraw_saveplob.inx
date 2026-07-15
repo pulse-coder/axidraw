@@ -40,6 +40,7 @@ gui-text="Specific layer selection:">1</param>
 <param indent="5" name="auto_rotate" type="bool" gui-text="Auto-rotate page when printing">true</param>	
 <param indent="5" name="random_start" type="bool" gui-text="Randomize starts of closed paths">false</param>
 <param indent="5" name="hiding" type="bool" gui-text="Hidden-line removal">false</param>
+<param indent="5" name="dedupe" type="bool" gui-text="Remove duplicate lines (CAD exports)">true</param>
 
 <spacer />
 <spacer />

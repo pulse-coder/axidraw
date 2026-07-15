@@ -229,10 +229,14 @@ gui-text="Pen-up movement speed (%):   ">75</param>
 <option value="4">None; Strictly preserve file order</option>
 </param>
 
+<param name="dedupe" type="bool" gui-text="Remove duplicate lines (CAD exports)">true</param>
+
 <param name="resolution" type="optiongroup" appearance="combo" gui-text="Motor Resolution:">
 <option value="1">~2870 DPI (Slightly smoother)</option>
 <option value="2">~1435 DPI (Slightly faster)</option>
-</param></vbox>
+</param>
+
+<param name="cartesian" type="bool" gui-text="Cartesian plotter (Motor 1 = X, Motor 2 = Y)">true</param></vbox>
 <image width="10" height="10">axidraw_deps/axidrawinternal/inx_img/spacer_10px.svg</image>
 </hbox>
 <image width="10" height="5">axidraw_deps/axidrawinternal/inx_img/spacer_10px.svg</image>

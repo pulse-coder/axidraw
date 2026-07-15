@@ -91,6 +91,15 @@ port_config = 0         # Serial port behavior option (0-2)
 auto_rotate = True      # Auto-select portrait vs landscape orientation
                             # Default: True
 
+dedupe = True           # DEDUPE MOD: Remove duplicate overlapping lines
+                            # (e.g., shared edges in CAD/SketchUp exports). Default True
+dedupe_tolerance = 0.001    # DEDUPE MOD: Matching tolerance for duplicate
+                            # lines, inches. Default 0.001
+
+cartesian = True        # CARTESIAN MOD: Motor 1 drives X only, Motor 2 drives Y
+                            # only (this machine), instead of AxiDraw's stock
+                            # mixed-axis motion. Default True
+
 reordering = 0          # Plot optimization option (0-4; 3 is deprecated)
                             # 0: Least; Only connect adjoining paths (Default)
                             # 1: Basic; Also reorder paths for speed
