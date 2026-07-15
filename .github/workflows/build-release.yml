@@ -1,0 +1,47 @@
+name: Build Inkscape extension release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release tag (e.g. v3.9.7-cartesian.1)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Build extension zip
+        run: python build/build_release.py --version "${{ inputs.version }}"
+
+      - name: Smoke-test the built tree
+        run: |
+          cd dist/axidraw_for_inkscape_build
+          python -m pip install -q lxml   # provided by Inkscape at runtime
+          cat > smoke.svg <<'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <svg xmlns="http://www.w3.org/2000/svg" width="8.5in" height="11in" viewBox="0 0 816 1056">
+            <path d="M 96,96 L 480,96 L 480,480 L 96,480 Z" fill="none" stroke="black"/>
+          </svg>
+          EOF
+          python axidraw_control.py --mode=plot --preview=true --report_time=true smoke.svg > /dev/null 2> report.txt
+          cat report.txt
+          grep -q "Length of path to draw: 0.406 m" report.txt
+          rm smoke.svg report.txt
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ inputs.version }}" dist/axidraw-cartesian-*.zip \
+            --title "AxiDraw Cartesian ${{ inputs.version }}" \
+            --notes "Inkscape extension build with the CARTESIAN MOD (Cartesian motor math, toggleable) and DEDUPE MOD (duplicate-line removal for CAD exports). Extract the zip contents into Inkscape's user extensions directory (Edit > Preferences > System > User extensions) and restart Inkscape. Requires Inkscape 1.2+. See INSTALL.txt and CARTESIAN-MODS.md inside the archive."
